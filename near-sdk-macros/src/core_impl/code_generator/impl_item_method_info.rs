@@ -3,7 +3,23 @@ use crate::core_impl::info_extractor::{
 };
 use proc_macro2::TokenStream as TokenStream2;
 use quote::quote;
-use syn::{ReturnType, Signature};
+use syn::{Path, ReturnType, Signature, Type};
+
+/// Checks whether the given path is literally "Result".
+/// Note that it won't match a fully qualified name `core::result::Result` or a type alias like
+/// `type StringResult = Result<String, String>`.
+fn path_is_result(path: &Path) -> bool {
+    path.leading_colon.is_none()
+        && path.segments.len() == 1
+        && path.segments.iter().next().unwrap().ident == "Result"
+}
+
+fn type_is_result(typ: &Type) -> bool {
+    match typ {
+        Type::Path(type_path) if type_path.qself.is_none() => path_is_result(&type_path.path),
+        _ => false,
+    }
+}
 
 impl ImplItemMethodInfo {
     /// Generate wrapper method for the given method of the contract.
@@ -53,6 +69,7 @@ impl ImplItemMethodInfo {
             method_type,
             is_payable,
             is_private,
+            is_returns_result,
             ..
         } = attr_signature_info;
         let deposit_check = if *is_payable || matches!(method_type, &MethodType::View) {
@@ -136,6 +153,30 @@ impl ImplItemMethodInfo {
                     #method_invocation;
                     #contract_ser
                 },
+                ReturnType::Type(_, return_type)
+                    if type_is_result(&return_type) && *is_returns_result =>
+                {
+                    let value_ser = match result_serializer {
+                        SerializerType::JSON => quote! {
+                            let result = near_sdk::serde_json::to_vec(&result).expect("Failed to serialize the return value using JSON.");
+                        },
+                        SerializerType::Borsh => quote! {
+                            let result = near_sdk::borsh::BorshSerialize::try_to_vec(&result).expect("Failed to serialize the return value using Borsh.");
+                        },
+                    };
+                    quote! {
+                        #contract_deser
+                        let result = #method_invocation;
+                        match result {
+                            Ok(result) => {
+                                #value_ser
+                                near_sdk::env::value_return(&result);
+                                #contract_ser
+                            }
+                            Err(err) => near_sdk::env::panic_str(&near_sdk::SdkFunctionError::message(&err))
+                        }
+                    }
+                }
                 ReturnType::Type(_, _) => {
                     let value_ser = match result_serializer {
                         SerializerType::JSON => quote! {
@@ -146,11 +187,11 @@ impl ImplItemMethodInfo {
                         },
                     };
                     quote! {
-                    #contract_deser
-                    let result = #method_invocation;
-                    #value_ser
-                    near_sdk::env::value_return(&result);
-                    #contract_ser
+                        #contract_deser
+                        let result = #method_invocation;
+                        #value_ser
+                        near_sdk::env::value_return(&result);
+                        #contract_ser
                     }
                 }
             }
