@@ -513,16 +513,29 @@ mod tests {
     pub fn test_add_access_key() {
         let alice = AccountId::new_unchecked("alice_near".to_string());
         let bob = AccountId::new_unchecked("bob_near".to_string());
-        let context = get_context(bob.clone(), bob.clone());
+        let context = get_context(alice.clone(), alice.clone());
         testing_env!(context.build());
 
-        let promise_alice = Promise::new(alice)
+        let promise_alice = Promise::new(alice.clone())
             .create_account()
             .deploy_contract(
                 include_bytes!("../../examples/status-message/res/status_message.wasm").to_vec(),
             )
-            .add_access_key(env::signer_account_pk(), 1000, bob, "set_status".to_string())
+            .add_full_access_key(env::signer_account_pk())
+            .add_access_key(env::signer_account_pk(), 1000, bob.clone(), "set_status".to_string())
             .function_call("default".to_string(), b"".to_vec(), 0, Gas(1000));
-            //.function_call("set_status".to_string(), b"status_bob".to_vec(), 0, Gas(1000));
+
+        let context = get_context(bob.clone(), alice.clone());
+        testing_env!(context.build());
+        let promise_bob = Promise::new(alice.clone())
+            .function_call(
+                "set_status".to_string(),
+                b"alice_status_set_by_bob".to_vec(),
+                0,
+                Gas(1000),
+            )
+            .function_call("get_status".to_string(), alice.as_bytes().to_vec(), 0, Gas(0));
+
+        promise_alice.then(promise_bob);
     }
 }
