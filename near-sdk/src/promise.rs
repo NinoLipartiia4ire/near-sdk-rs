@@ -492,3 +492,37 @@ impl<T: borsh::BorshSerialize> borsh::BorshSerialize for PromiseOrValue<T> {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::test_utils::VMContextBuilder;
+
+    pub use super::super::environment::env;
+    pub use crate::testing_env;
+
+    fn get_context(current: AccountId, predecessor: AccountId) -> VMContextBuilder {
+        let mut builder = VMContextBuilder::new();
+        builder.current_account_id(current);
+        builder.predecessor_account_id(predecessor.clone());
+        builder.signer_account_id(predecessor);
+        builder
+    }
+
+    #[test]
+    pub fn test_add_access_key() {
+        let alice = AccountId::new_unchecked("alice_near".to_string());
+        let bob = AccountId::new_unchecked("bob_near".to_string());
+        let context = get_context(bob.clone(), bob.clone());
+        testing_env!(context.build());
+
+        let promise_alice = Promise::new(alice)
+            .create_account()
+            .deploy_contract(
+                include_bytes!("../../examples/status-message/res/status_message.wasm").to_vec(),
+            )
+            .add_access_key(env::signer_account_pk(), 1000, bob, "set_status".to_string())
+            .function_call("default".to_string(), b"".to_vec(), 0, Gas(1000));
+            //.function_call("set_status".to_string(), b"status_bob".to_vec(), 0, Gas(1000));
+    }
+}
