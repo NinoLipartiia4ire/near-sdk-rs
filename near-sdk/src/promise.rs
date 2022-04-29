@@ -499,6 +499,7 @@ mod tests {
     use crate::test_utils::VMContextBuilder;
 
     pub use super::super::environment::env;
+    pub use super::super::environment::mock::MockedBlockchain;
     pub use crate::testing_env;
 
     fn get_context(current: AccountId, predecessor: AccountId) -> VMContextBuilder {
