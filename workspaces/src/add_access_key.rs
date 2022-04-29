@@ -9,25 +9,6 @@ use near_primitives::views::FinalExecutionStatus;
 
 const ACCESS_KEY_WASM_FILEPATH: &str = "../examples/access-key/res/access_key.wasm";
 
-/*pub async fn init_status_message(
-    worker: &workspaces::Worker<impl DevNetwork>,
-) -> anyhow::Result<workspaces::Contract> {
-    let wasm = std::fs::read(NFT_WASM_FILEPATH)?;
-    let contract = worker.dev_deploy(wasm).await?;
-    /*let outcome = contract
-        .call(worker, "default")
-        .args_json(serde_json::json!({
-        }))?
-        .gas(parse_gas!("150 Tgas") as u64)
-        .transact()
-        .await?;
-    match outcome.status {
-        near_primitives::views::FinalExecutionStatus::SuccessValue(_) => (),
-        _ => panic!("Failed to deploy"),
-    };*/
-    Ok(contract)
-}*/
-
 #[tokio::test]
 async fn test_add_access_key_positive() -> anyhow::Result<()> {
     let worker = workspaces::sandbox().await?;
@@ -57,10 +38,17 @@ async fn test_add_access_key_positive() -> anyhow::Result<()> {
             "account_id": alice.clone(),
             "public_key": pk,
             "allowance": 10,
-            "receiver_id": bob,
+            "receiver_id": bob.clone(),
         }))?
         .transact()
         .await?;
+    
+    let mut credentials = String::from("~/.near-credentials/testnet/");
+    credentials.push_str(contract.id().as_str());
+    credentials.push_str(".json");
+    //println!("{}", credentials);
+    //let workspaces_alice = Account::from_file(credentials);
+    
 
     Ok(())
 }

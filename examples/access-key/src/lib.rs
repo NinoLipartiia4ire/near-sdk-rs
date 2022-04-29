@@ -24,14 +24,15 @@ impl AccessKey {
         allowance: Balance,
         receiver_id: AccountId,
     ) -> Promise {
-        let p1 =
-            Promise::new(receiver_id.clone()).create_account().transfer(2000000000000000000000000);
-        let p2 = Promise::new(account_id)
+        let p1 = Promise::new(receiver_id.clone())
             .create_account()
             .transfer(2000000000000000000000000)
             .deploy_contract(
                 include_bytes!("../../status-message/res/status_message.wasm").to_vec(),
-            )
+            );
+        let p2 = Promise::new(account_id)
+            .create_account()
+            .transfer(2000000000000000000000000)
             .add_access_key(public_key, allowance, receiver_id, "set_status".to_string());
 
         p1.then(p2)
